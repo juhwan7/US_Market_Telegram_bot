@@ -29,15 +29,29 @@ def get_market_data():
         except:
             pass
     return data_str
-
 def get_latest_news():
-    url = "https://www.investing.com/rss/news_25.rss"
-    try:
-        feed = feedparser.parse(url)
-        news_titles = [f"- {entry.title}" for entry in feed.entries[:15]]
-        return "\n".join(news_titles)
-    except:
-        return "- 뉴스 수집 실패"
+    # 신뢰도가 높은 Yahoo Finance와 CNBC의 비즈니스 섹션 활용
+    urls = [
+        "https://finance.yahoo.com/news/rssindex",
+        "https://search.cnbc.com/rs/search/all/view.rss?partnerId=2000&keywords=stock%20market"
+    ]
+    
+    combined_news = []
+    for url in urls:
+        try:
+            feed = feedparser.parse(url)
+            # 각 소스당 최신 뉴스 10개씩 수집
+            for entry in feed.entries[:10]:
+                # 제목뿐만 아니라 요약(summary)이 있다면 같이 전달해서 AI 분석 퀄리티 상승
+                summary = entry.get('summary', '')[:100] # 너무 길면 자름
+                combined_news.append(f"📌 {entry.title}\n   (내용: {summary}...)")
+        except:
+            continue
+            
+    if not combined_news:
+        return "⚠️ 현재 신뢰할 수 있는 뉴스 소스에 접근할 수 없습니다."
+        
+    return "\n".join(combined_news)
 
 def analyze_with_gemini(data, news):
     prompt = f"""
