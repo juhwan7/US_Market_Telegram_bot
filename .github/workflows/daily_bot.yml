@@ -1,0 +1,31 @@
+name: US Market Telegram Bot
+
+on:
+  schedule:
+    # 깃허브 서버는 UTC 기준입니다. 한국 시간(KST)은 UTC보다 9시간 빠릅니다.
+    # 한국 아침 6시 = UTC 전날 밤 9시 (21:00)
+    - cron: '0 21 * * *'
+  workflow_dispatch: # 이 줄이 있으면 깃허브 페이지에서 '수동 실행' 버튼을 누를 수 있습니다.
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 코드 가져오기
+        uses: actions/checkout@v3
+
+      - name: 파이썬 환경 세팅
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10' # 사용하는 파이썬 버전에 맞게 수정 가능
+
+      - name: 필요한 패키지 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 파이썬 스크립트 실행
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
