@@ -1,15 +1,14 @@
 import os
 import requests
 import yfinance as yf
-# 여기를 아래와 같이 수정해야 합니다
-from google.genai import Client 
+from google import genai # Import 방식을 이렇게 바꿔야 합니다
 import feedparser
 from datetime import datetime
 
 # 설정
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
-# 최신 SDK 초기화
-client = Client(api_key=GEMINI_KEY) 
+# 최신 SDK 클라이언트 초기화
+client = genai.Client(api_key=GEMINI_KEY) 
 
 def get_market_data():
     tickers = {
@@ -57,7 +56,7 @@ def analyze_with_gemini(data, news):
     트레이딩 전문 용어를 사용하고, 매우 상세하고 날카롭게 분석해줘.
     """
     try:
-        # 모델명: gemini-3.1-flash-lite-preview
+        # 모델명 정확히 입력
         response = client.models.generate_content(
             model='gemini-3.1-flash-lite-preview',
             contents=prompt

@@ -10,22 +10,22 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    # 노드 24 강제 사용 옵션 (경고 제거용)
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: 저장소 코드 가져오기
-        uses: actions/checkout@v4 # 최신 패치 적용 버전
+        uses: actions/checkout@v4
 
       - name: 파이썬 환경 세팅
-        uses: actions/setup-python@v5 # 최신 패치 적용 버전
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # 2026년 기준 표준 버전으로 상향
+          python-version: '3.11' # 가장 안정적인 3.11 버전 권장
 
       - name: 필요한 패키지 설치
         run: |
           python -m pip install --upgrade pip
-          pip install requests yfinance pandas google-generativeai feedparser
+          # 구글 최신 SDK와 필요한 라이브러리 강제 설치
+          pip install -U google-genai yfinance pandas requests feedparser
 
       - name: 파이썬 스크립트 실행
         env:
