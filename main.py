@@ -1,53 +1,59 @@
-import yfinance as yf
 import os
 import requests
+import yfinance as yf
+import google.generativeai as genai
+import feedparser
 from datetime import datetime
 
-def get_market_summary():
-    # 1. 수집할 종목 (국내 증시 영향 지표)
-    tickers = {
-        "나스닥": "^IXIC",
-        "필라델피아 반도체": "^SOX",  # 국장 반도체주 영향
-        "한국 ETF (EWY)": "EWY",      # 외인 수급 예측
-        "원/달러 환율": "KRW=X",      # 자금 유출입 지표
-        "미 10년물 금리": "^TNX",     # 성장주 영향
-        "엔비디아": "NVDA"            # AI 반도체 대장주
-    }
+# 1. 환경 설정
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+def get_market_data():
+    # 주요 지표 수집
+    tickers = {"나스닥": "^IXIC", "반도체": "^SOX", "환율": "KRW=X", "EWY": "EWY"}
+    data_str = ""
+    for name, sym in tickers.items():
+        d = yf.Ticker(sym).history(period="2d")
+        change = ((d['Close'].iloc[-1] - d['Close'].iloc[-2]) / d['Close'].iloc[-2]) * 100
+        data_str += f"{name}: {change:+.2f}% / "
+    return data_str
+
+def get_latest_news():
+    # 인베스팅닷컴 주요 뉴스 RSS (신뢰도 높은 소스)
+    url = "https://www.investing.com/rss/news_25.rss" # 주식 시장 뉴스
+    feed = feedparser.parse(url)
+    news_titles = [entry.title for entry in feed.entries[:8]] # 최근 8개 뉴스 제목
+    return "\n".join(news_titles)
+
+def analyze_with_gemini(data, news):
+    prompt = f"""
+    너는 전문 주식 분석가야. 아래 미국장 데이터와 주요 뉴스를 보고 한국 시장(KOSPI/KOSDAQ)에 미칠 영향을 분석해줘.
     
-    now = datetime.now().strftime('%Y-%m-%d %H:%M')
-    msg = f"📊 [미국장/매크로 요약] {now}\n\n"
+    [미국장 데이터]: {data}
+    [주요 뉴스]:
+    {news}
     
-    for name, symbol in tickers.items():
-        try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="2d")
-            
-            if len(df) >= 2:
-                current = df['Close'].iloc[-1]
-                prev = df['Close'].iloc[-2]
-                change_pct = ((current - prev) / prev) * 100
-                
-                emoji = "🔴" if change_pct > 0 else "🔵"
-                msg += f"{emoji} {name}: {current:,.2f} ({change_pct:+.2f}%)\n"
-            else:
-                msg += f"⚪ {name}: 데이터 수집 불가\n"
-        except Exception as e:
-            msg += f"⚠️ {name}: 에러 발생\n"
-            
-    msg += "\n💡 국장 팁: 반도체 지수와 EWY가 상승하면 코스피 상승 확률이 높습니다."
-    return msg
+    형식:
+    1. 요약: (한 문장)
+    2. 국장 영향: (반도체, 2차전지 등 섹터별 전망)
+    3. 주의사항: (오늘 조심해야 할 점)
+    말투는 친절하고 명확하게 한국어로 작성해줘.
+    """
+    response = model.generate_content(prompt)
+    return response.text
 
 def send_telegram(text):
     token = os.environ.get("TELEGRAM_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    
-    try:
-        response = requests.post(url, json={"chat_id": chat_id, "text": text})
-        print(f"전송 상태: {response.status_code}")
-    except Exception as e:
-        print(f"전송 에러: {e}")
+    requests.post(url, json={"chat_id": chat_id, "text": text})
 
 if __name__ == "__main__":
-    report = get_market_summary()
-    send_telegram(report)
+    market_data = get_market_data()
+    news_headlines = get_latest_news()
+    ai_analysis = analyze_with_gemini(market_data, news_headlines)
+    
+    final_msg = f"🤖 [AI 미국장 분석 리포트]\n\n{ai_analysis}"
+    send_telegram(final_msg)
