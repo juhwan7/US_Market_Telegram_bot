@@ -76,9 +76,10 @@ def analyze_with_gemini(data, news):
             print(f"▶️ 3단계: {model_name} AI 분석 중... ({attempt + 1}/3)")
             model = genai.GenerativeModel(model_name)
             
-            # 주식 뉴스(전쟁, 파업 등) 필터링 차단 방지 설정
+            # 🚨 보안 추가: 30초 안에 응답 안 하면 강제로 끊고 에러 처리!
             response = model.generate_content(
                 prompt,
+                request_options={"timeout": 30}, # 타임아웃 설정
                 safety_settings={
                     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
                     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -89,13 +90,13 @@ def analyze_with_gemini(data, news):
             print("✅ AI 분석 완료!")
             return response.text
         except Exception as e:
-            print(f"⚠️ AI 분석 에러 발생: {e}")
+            # 30초가 지나면 여기서 강제로 에러를 뱉어냅니다.
+            print(f"⚠️ AI 분석 에러 발생 (응답 지연 등): {e}") 
             if attempt < 2:
                 print("⏳ 10초 대기 후 다시 시도합니다...")
                 time.sleep(10)
             else:
-                return f"❌ 3번 재시도했으나 분석 실패: {e}"
-
+                return f"❌ 3번 재시도했으나 서버 무응답으로 분석 실패: {e}"
 def send_telegram(text):
     print("▶️ 4단계: 텔레그램 전송 중...")
     token = os.environ.get("TELEGRAM_TOKEN")
