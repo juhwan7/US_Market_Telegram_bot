@@ -1,17 +1,39 @@
+import yfinance as yf
 import os
 import requests
 
-# GitHub Secrets에서 토큰과 아이디를 불러옵니다.
-TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+def get_market_data():
+    # 가져올 종목 리스트 (나스닥, 반도체지수, 한국ETF, 환율, 10년물 금리)
+    tickers = {
+        "나스닥": "^IXIC",
+        "반도체지수": "^SOX",
+        "한국ETF(EWY)": "EWY",
+        "원/달러환율": "KRW=X",
+        "미10년물금리": "^TNX"
+    }
+    
+    msg = "📢 [미국장 정리 및 국장 전망]\n\n"
+    
+    for name, ticker in tickers.items():
+        data = yf.Ticker(ticker).history(period="2d")
+        if len(data) < 2: continue
+        
+        current = data['Close'].iloc[-1]
+        prev = data['Close'].iloc[-2]
+        change = ((current - prev) / prev) * 100
+        
+        emoji = "🔴" if change > 0 else "🔵"
+        msg += f"{emoji} {name}: {current:.2f} ({change:+.2f}%)\n"
+    
+    return msg
 
-def send_telegram_message(text):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": text}
-    requests.post(url, json=payload)
+# 텔레그램 전송 함수 (기존과 동일)
+def send_telegram(text):
+    token = os.environ.get("TELEGRAM_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    requests.post(url, json={"chat_id": chat_id, "text": text})
 
-# 1. 여기서 미국장 데이터를 수집/정리하는 코드를 작성합니다.
-market_summary = "오늘의 미국장 요약: 나스닥 상승, S&P 500 보합..." # (예시)
-
-# 2. 정리된 텍스트를 텔레그램으로 전송합니다.
-send_telegram_message(market_summary)
+if __name__ == "__main__":
+    report = get_market_data()
+    send_telegram(report)
