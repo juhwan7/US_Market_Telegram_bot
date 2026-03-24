@@ -8,7 +8,7 @@ from datetime import datetime
 # 1. 환경 설정
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
 
 def get_market_data():
     # 주요 지표 수집
