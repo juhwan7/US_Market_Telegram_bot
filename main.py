@@ -6,17 +6,18 @@ import feedparser
 import time
 from datetime import datetime
 
-# 1. 설정
+# 1. 설정 (GitHub Secrets에서 가져옴)
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_KEY)
 
 def get_market_data():
+    # 지수 및 섹터 ETF 데이터 수집
     tickers = {
         "나스닥": "^IXIC", "S&P500": "^GSPC", "반도체(SOX)": "^SOX",
         "VIX(공포)": "^VIX", "미10년물금리": "^TNX", "원달러환율": "KRW=X",
-        "XLK(기술)": "XLK", "XLF(금융)": "XLF", "XLE(에너지)": "XLE"
+        "XLK(기술)": "XLK", "XLF(금융)": "XLF"
     }
-    data_str = "📊 [시장 주요 지표]\n"
+    data_str = "📊 [전일 주요 지표]\n"
     for name, sym in tickers.items():
         try:
             d = yf.Ticker(sym).history(period="2d")
@@ -28,10 +29,8 @@ def get_market_data():
     return data_str
 
 def get_latest_news():
-    urls = [
-        "https://finance.yahoo.com/news/rssindex",
-        "https://search.cnbc.com/rs/search/all/view.rss?partnerId=2000&keywords=stock%20market"
-    ]
+    # Yahoo Finance 및 CNBC 뉴스 수집
+    urls = ["https://finance.yahoo.com/news/rssindex", "https://search.cnbc.com/rs/search/all/view.rss?partnerId=2000&keywords=stock%20market"]
     news = []
     for url in urls:
         try:
@@ -42,38 +41,32 @@ def get_latest_news():
     return "\n".join(news) if news else "뉴스 수집 실패"
 
 def analyze_with_gemini(data, news):
-    # 확인된 모델 리스트 중 최적의 조합 (models/ 경로 포함 필수)
+    # 우리가 방금 조회한 리스트 중 가장 똑똑한 모델들로 구성
     model_priority = [
         'models/gemini-3.1-pro-preview', 
         'models/gemini-2.5-pro',
-        'models/gemini-3.1-flash-lite-preview'
+        'models/gemini-1.5-pro'
     ]
     
     prompt = f"""
-    너는 기관 투자자 수준의 분석력을 가진 전문 프랍 트레이더야.
-    아래 데이터를 바탕으로 오늘 한국 시장(KOSPI/KOSDAQ)의 대응 시나리오를 매우 상세하게 작성해줘.
-
-    [시장 지표]: {data}
-    [해외 뉴스]: {news}
-    
-    분석에 포함할 내용:
-    - 매크로 환경(금리, 환율)이 국장 수급에 주는 시그널
-    - 미장 섹터 로테이션에 따른 오늘 국장 주도 테마(반도체, 2차전지 등) 예측
-    - 트레이더가 오늘 장 중 반드시 체크해야 할 리스크 포인트
+    너는 전문 프랍 트레이더야. 국장 트레이더를 위한 심층 분석 리포트를 작성해.
+    [데이터]: {data}
+    [뉴스]: {news}
+    [요청]: 글로벌 매크로 분석, 섹터 로테이션, 특징주, 국장 시나리오(반도체/2차전지 등)를 전문 용어를 써서 매우 상세하게 분석해줘.
     """
     
     for m_name in model_priority:
-        for attempt in range(2): # 각 모델당 2번씩 시도
-            try:
                 print(f"🚀 {m_name} 모델로 분석 시작...")
-                model = genai.GenerativeModel(m_name)
-                response = model.generate_content(prompt)
-                return response.text
-            except Exception as e:
-                print(f"⚠️ {m_name} 실패: {e}")
-                time.sleep(5) # 5초 대기 후 재시도 또는 다음 모델로
-                
-    return "❌ 모든 AI 모델이 응답하지 않습니다. 지표 데이터를 직접 확인하세요."
+        try:
+            print(f"🚀 {m_name} 분석 시도...")
+            model = genai.GenerativeModel(m_name)
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            print(f"⚠️ {m_name} 실패: {e}")
+            time.sleep(2)
+            continue
+    return "❌ AI 분석 실패"
 
 def send_telegram(text):
     token = os.environ.get("TELEGRAM_TOKEN")
