@@ -1,16 +1,17 @@
 import os
 import requests
 import yfinance as yf
-from genai import Client # 최신 라이브러리 방식
+# 여기를 아래와 같이 수정해야 합니다
+from google.genai import Client 
 import feedparser
 from datetime import datetime
 
 # 설정
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
-client = Client(api_key=GEMINI_KEY) # 최신 SDK 초기화 방식
+# 최신 SDK 초기화
+client = Client(api_key=GEMINI_KEY) 
 
 def get_market_data():
-    # 섹터별 흐름 파악을 위한 데이터 수집
     tickers = {
         "나스닥": "^IXIC", "S&P500": "^GSPC", "반도체(SOX)": "^SOX",
         "러셀2000": "^RUT", "VIX(공포지수)": "^VIX", "미10년물금리": "^TNX",
@@ -56,7 +57,7 @@ def analyze_with_gemini(data, news):
     트레이딩 전문 용어를 사용하고, 매우 상세하고 날카롭게 분석해줘.
     """
     try:
-        # 최신 google-genai 라이브러리 호출 방식
+        # 모델명: gemini-3.1-flash-lite-preview
         response = client.models.generate_content(
             model='gemini-3.1-flash-lite-preview',
             contents=prompt
