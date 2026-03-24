@@ -46,6 +46,7 @@ def get_latest_news():
 
 def analyze_with_gemini(data, news):
     model_name = 'models/gemini-3.1-flash-lite-preview'
+    model_name = 'models/gemini-2.5-flash'    
     
     prompt = f"""
     너는 주식 시장의 복잡한 뉴스와 데이터를 초등학생도 이해할 수 있을 만큼 아주 쉽고 친절하게 설명해주는 똑똑한 주식 선생님이야.
