@@ -6,6 +6,7 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold # 필터 
 import feedparser
 import time
 from datetime import datetime
+#깃허브액션 테스트
 
 # 1. 설정
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
