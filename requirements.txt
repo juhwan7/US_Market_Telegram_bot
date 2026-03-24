@@ -1,4 +1,5 @@
 requests
 yfinance
 pandas
-beautifulsoup4
+google-generativeai
+feedparser
