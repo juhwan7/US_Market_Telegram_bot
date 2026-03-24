@@ -3,6 +3,7 @@ import requests
 import yfinance as yf
 import google.generativeai as genai
 import feedparser
+import time
 from datetime import datetime
 
 # 1. 설정
@@ -41,8 +42,8 @@ def get_latest_news():
     return "\n".join(news) if news else "뉴스 수집 실패"
 
 def analyze_with_gemini(data, news):
-    # 다른 모델 없이 무조건 3.1-pro-preview만 사용합니다.
-    model_name = 'models/gemini-3.1-pro-preview'
+    # 캡처 화면에서 확인된 할당량이 있는 정확한 모델명
+    model_name = 'models/gemini-3.1-flash-lite-preview'
     
     prompt = f"""
     너는 전문 프랍 트레이더야. 국장 트레이더를 위한 심층 분석 리포트를 작성해.
@@ -51,13 +52,20 @@ def analyze_with_gemini(data, news):
     [요청]: 글로벌 매크로 분석, 섹터 로테이션, 특징주, 국장 시나리오(반도체/2차전지 등)를 전문 용어를 써서 매우 상세하게 분석해줘.
     """
     
-    try:
-        print(f"🚀 {model_name} 로 분석을 시작합니다...")
-        model = genai.GenerativeModel(model_name)
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"❌ 3.1 Pro 모델 분석 실패 (서버 부하 등): {e}"
+    # 끈질긴 재시도 로직 (최대 3번 시도, 중간에 10초씩 지연)
+    for attempt in range(3):
+        try:
+            print(f"🚀 {model_name} 로 분석 시도 중... ({attempt + 1}/3)")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            print(f"⚠️ 에러 발생: {e}")
+            if attempt < 2:
+                print("⏳ 서버 안정화를 위해 10초 대기 후 다시 시도합니다...")
+                time.sleep(10)
+            else:
+                return f"❌ 3번 재시도했으나 분석 실패: {e}"
 
 def send_telegram(text):
     token = os.environ.get("TELEGRAM_TOKEN")
