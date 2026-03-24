@@ -3,15 +3,13 @@ import requests
 import yfinance as yf
 import google.generativeai as genai
 import feedparser
-import time
 from datetime import datetime
 
-# 1. 설정 (GitHub Secrets에서 가져옴)
+# 1. 설정
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_KEY)
 
 def get_market_data():
-    # 지수 및 섹터 ETF 데이터 수집
     tickers = {
         "나스닥": "^IXIC", "S&P500": "^GSPC", "반도체(SOX)": "^SOX",
         "VIX(공포)": "^VIX", "미10년물금리": "^TNX", "원달러환율": "KRW=X",
@@ -29,8 +27,10 @@ def get_market_data():
     return data_str
 
 def get_latest_news():
-    # Yahoo Finance 및 CNBC 뉴스 수집
-    urls = ["https://finance.yahoo.com/news/rssindex", "https://search.cnbc.com/rs/search/all/view.rss?partnerId=2000&keywords=stock%20market"]
+    urls = [
+        "https://finance.yahoo.com/news/rssindex",
+        "https://search.cnbc.com/rs/search/all/view.rss?partnerId=2000&keywords=stock%20market"
+    ]
     news = []
     for url in urls:
         try:
@@ -41,12 +41,8 @@ def get_latest_news():
     return "\n".join(news) if news else "뉴스 수집 실패"
 
 def analyze_with_gemini(data, news):
-    # 우리가 방금 조회한 리스트 중 가장 똑똑한 모델들로 구성
-    model_priority = [
-        'models/gemini-3.1-pro-preview', 
-        'models/gemini-2.5-pro',
-        'models/gemini-1.5-pro'
-    ]
+    # 다른 모델 없이 무조건 3.1-pro-preview만 사용합니다.
+    model_name = 'models/gemini-3.1-pro-preview'
     
     prompt = f"""
     너는 전문 프랍 트레이더야. 국장 트레이더를 위한 심층 분석 리포트를 작성해.
@@ -55,18 +51,13 @@ def analyze_with_gemini(data, news):
     [요청]: 글로벌 매크로 분석, 섹터 로테이션, 특징주, 국장 시나리오(반도체/2차전지 등)를 전문 용어를 써서 매우 상세하게 분석해줘.
     """
     
-    for m_name in model_priority:
-                print(f"🚀 {m_name} 모델로 분석 시작...")
-        try:
-            print(f"🚀 {m_name} 분석 시도...")
-            model = genai.GenerativeModel(m_name)
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            print(f"⚠️ {m_name} 실패: {e}")
-            time.sleep(2)
-            continue
-    return "❌ AI 분석 실패"
+    try:
+        print(f"🚀 {model_name} 로 분석을 시작합니다...")
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"❌ 3.1 Pro 모델 분석 실패 (서버 부하 등): {e}"
 
 def send_telegram(text):
     token = os.environ.get("TELEGRAM_TOKEN")

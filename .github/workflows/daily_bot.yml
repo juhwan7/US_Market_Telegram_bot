@@ -19,13 +19,12 @@ jobs:
       - name: 파이썬 환경 세팅
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # 가장 안정적인 3.11 버전 권장
+          python-version: '3.11'
 
-      - name: 필요한 패키지 설치
+      - name: 패키지 강제 직접 설치 (에러 해결의 핵심)
         run: |
           python -m pip install --upgrade pip
-          # 구글 최신 SDK와 필요한 라이브러리 강제 설치
-          pip install -U google-genai yfinance pandas requests feedparser
+          pip install google-generativeai yfinance pandas requests feedparser
 
       - name: 파이썬 스크립트 실행
         env:
