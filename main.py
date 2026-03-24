@@ -125,7 +125,9 @@ def send_telegram(text):
         if res.status_code == 200:
             print("✅ 텔레그램 메시지 전송 성공!")
         else:
-            print(f"❌ 텔레그램 전송 실패! 상태 코드: {res.status_code}, 이유: {res.text}")
+            print(f"⚠️ HTML 전송 거부됨! 이유: {res.text}")
+            print("🔄 일반 텍스트 모드로 안전하게 재시도합니다...")
+            
             # 2차 시도: 에러가 나면 디자인(HTML) 옵션을 빼고 순수 글자만 강제 전송
             payload.pop("parse_mode", None)
             res_retry = requests.post(url, json=payload)
