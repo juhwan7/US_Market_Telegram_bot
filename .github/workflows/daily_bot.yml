@@ -2,31 +2,34 @@ name: US Market Telegram Bot
 
 on:
   push:
-    branches: [ "main" ]  # main 브랜치에 코드가 올라오면 즉시 실행
+    branches: [ "main" ]
   schedule:
-    # 한국 시간 오전 6시 (UTC 21:00)
     - cron: '0 21 * * *'
-  workflow_dispatch: # 수동 실행 버튼 활성화
+  workflow_dispatch:
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    # 노드 24 강제 사용 옵션 (경고 제거용)
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: 저장소 코드 가져오기
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 # 최신 패치 적용 버전
 
       - name: 파이썬 환경 세팅
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5 # 최신 패치 적용 버전
         with:
-          python-version: '3.10'
+          python-version: '3.12' # 2026년 기준 표준 버전으로 상향
 
       - name: 필요한 패키지 설치
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install requests yfinance pandas google-generativeai feedparser
 
       - name: 파이썬 스크립트 실행
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python main.py
