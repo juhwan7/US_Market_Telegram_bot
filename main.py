@@ -1,83 +1,79 @@
 import os
 import requests
 import yfinance as yf
-from google import genai # Import 방식을 이렇게 바꿔야 합니다
+import google.generativeai as genai
 import feedparser
+import time
 from datetime import datetime
 
-# 설정
+# 1. 설정
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
-# 최신 SDK 클라이언트 초기화
-client = genai.Client(api_key=GEMINI_KEY) 
+genai.configure(api_key=GEMINI_KEY)
 
 def get_market_data():
     tickers = {
         "나스닥": "^IXIC", "S&P500": "^GSPC", "반도체(SOX)": "^SOX",
-        "러셀2000": "^RUT", "VIX(공포지수)": "^VIX", "미10년물금리": "^TNX",
-        "원달러환율": "KRW=X", "XLK(기술)": "XLK", "XLF(금융)": "XLF"
+        "VIX(공포)": "^VIX", "미10년물금리": "^TNX", "원달러환율": "KRW=X",
+        "XLK(기술)": "XLK", "XLF(금융)": "XLF", "XLE(에너지)": "XLE"
     }
-    
-    data_str = "📊 [전일 주요 지표 및 섹터 등락]\n"
+    data_str = "📊 [시장 주요 지표]\n"
     for name, sym in tickers.items():
         try:
             d = yf.Ticker(sym).history(period="2d")
             if len(d) >= 2:
-                current = d['Close'].iloc[-1]
-                prev = d['Close'].iloc[-2]
+                current, prev = d['Close'].iloc[-1], d['Close'].iloc[-2]
                 change = ((current - prev) / prev) * 100
                 data_str += f"- {name}: {current:.2f} ({change:+.2f}%)\n"
-        except:
-            pass
+        except: continue
     return data_str
+
 def get_latest_news():
-    # 신뢰도가 높은 Yahoo Finance와 CNBC의 비즈니스 섹션 활용
     urls = [
         "https://finance.yahoo.com/news/rssindex",
         "https://search.cnbc.com/rs/search/all/view.rss?partnerId=2000&keywords=stock%20market"
     ]
-    
-    combined_news = []
+    news = []
     for url in urls:
         try:
             feed = feedparser.parse(url)
-            # 각 소스당 최신 뉴스 10개씩 수집
-            for entry in feed.entries[:10]:
-                # 제목뿐만 아니라 요약(summary)이 있다면 같이 전달해서 AI 분석 퀄리티 상승
-                summary = entry.get('summary', '')[:100] # 너무 길면 자름
-                combined_news.append(f"📌 {entry.title}\n   (내용: {summary}...)")
-        except:
-            continue
-            
-    if not combined_news:
-        return "⚠️ 현재 신뢰할 수 있는 뉴스 소스에 접근할 수 없습니다."
-        
-    return "\n".join(combined_news)
+            for entry in feed.entries[:8]:
+                news.append(f"📌 {entry.title}")
+        except: continue
+    return "\n".join(news) if news else "뉴스 수집 실패"
 
 def analyze_with_gemini(data, news):
+    # 확인된 모델 리스트 중 최적의 조합 (models/ 경로 포함 필수)
+    model_priority = [
+        'models/gemini-3.1-pro-preview', 
+        'models/gemini-2.5-pro',
+        'models/gemini-3.1-flash-lite-preview'
+    ]
+    
     prompt = f"""
-    너는 기관 투자자 수준의 정보력을 가진 전문 프랍 트레이더야.
-    한국 KOSPI/KOSDAQ 시장에서 수급과 차트를 기반으로 매매하는 전문 전업 투자자를 위해 '미장 딥다이브 리포트'를 작성해줘.
+    너는 기관 투자자 수준의 분석력을 가진 전문 프랍 트레이더야.
+    아래 데이터를 바탕으로 오늘 한국 시장(KOSPI/KOSDAQ)의 대응 시나리오를 매우 상세하게 작성해줘.
 
-    [시장 데이터]: {data}
-    [뉴스 헤드라인]: {news}
+    [시장 지표]: {data}
+    [해외 뉴스]: {news}
     
-    [필수 포함 내용]
-    1. 🌐 글로벌 매크로 분석: 금리, 환율, VIX 변화가 시장에 준 시그널
-    2. 🏢 섹터 로테이션: 돈이 어디서 빠져서 어디로 들어갔는가? (XLK, XLF 등 참고)
-    3. 🔥 특징주 요약: 변동성이 컸던 미장 종목과 그 이유
-    4. 🎯 국장 대응 시나리오: 오늘 시초가 주도 섹터 예측 및 리스크 관리 전략
-    
-    트레이딩 전문 용어를 사용하고, 매우 상세하고 날카롭게 분석해줘.
+    분석에 포함할 내용:
+    - 매크로 환경(금리, 환율)이 국장 수급에 주는 시그널
+    - 미장 섹터 로테이션에 따른 오늘 국장 주도 테마(반도체, 2차전지 등) 예측
+    - 트레이더가 오늘 장 중 반드시 체크해야 할 리스크 포인트
     """
-    try:
-        # 모델명 정확히 입력
-        response = client.models.generate_content(
-            model='gemini-3.1-flash-lite-preview',
-            contents=prompt
-        )
-        return response.text
-    except Exception as e:
-        return f"분석 오류: {e}"
+    
+    for m_name in model_priority:
+        for attempt in range(2): # 각 모델당 2번씩 시도
+            try:
+                print(f"🚀 {m_name} 모델로 분석 시작...")
+                model = genai.GenerativeModel(m_name)
+                response = model.generate_content(prompt)
+                return response.text
+            except Exception as e:
+                print(f"⚠️ {m_name} 실패: {e}")
+                time.sleep(5) # 5초 대기 후 재시도 또는 다음 모델로
+                
+    return "❌ 모든 AI 모델이 응답하지 않습니다. 지표 데이터를 직접 확인하세요."
 
 def send_telegram(text):
     token = os.environ.get("TELEGRAM_TOKEN")
@@ -87,10 +83,8 @@ def send_telegram(text):
         requests.post(url, json={"chat_id": chat_id, "text": text[i:i+4000]})
 
 if __name__ == "__main__":
-    now = datetime.now().strftime('%Y-%m-%d')
-    market_data = get_market_data()
-    news_headlines = get_latest_news()
-    ai_report = analyze_with_gemini(market_data, news_headlines)
-    
-    final_msg = f"🦅 [Pro 트레이더 미장 분석 - {now}]\n\n{ai_report}"
+    m_data = get_market_data()
+    n_data = get_latest_news()
+    report = analyze_with_gemini(m_data, n_data)
+    final_msg = f"🦅 [Pro 트레이더 분석 - {datetime.now().strftime('%Y-%m-%d')}]\n\n{report}"
     send_telegram(final_msg)
