@@ -2,6 +2,7 @@ import os
 import requests
 import yfinance as yf
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold # 필터 해제용
 import feedparser
 import time
 from datetime import datetime
@@ -11,6 +12,7 @@ GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_KEY)
 
 def get_market_data():
+    print("▶️ 1단계: 시장 데이터 수집 중...")
     tickers = {
         "나스닥": "^IXIC", "S&P500": "^GSPC", "반도체(SOX)": "^SOX",
         "VIX(공포)": "^VIX", "미10년물금리": "^TNX", "원달러환율": "KRW=X",
@@ -28,6 +30,7 @@ def get_market_data():
     return data_str
 
 def get_latest_news():
+    print("▶️ 2단계: 최신 뉴스 수집 중...")
     urls = [
         "https://finance.yahoo.com/news/rssindex",
         "https://search.cnbc.com/rs/search/all/view.rss?partnerId=2000&keywords=stock%20market"
@@ -42,7 +45,6 @@ def get_latest_news():
     return "\n".join(news) if news else "뉴스 수집 실패"
 
 def analyze_with_gemini(data, news):
-    # 캡처 화면에서 확인된 할당량이 있는 정확한 모델명
     model_name = 'models/gemini-3.1-flash-lite-preview'
     
     prompt = f"""
@@ -69,31 +71,48 @@ def analyze_with_gemini(data, news):
     - (오늘 한국 주식 시장에서 조심해야 할 점과, 관심 있게 지켜봐야 할 부분을 동화책 읽어주듯 쉽고 명확하게 설명)
     """
     
-    # 끈질긴 재시도 로직 (최대 3번 시도, 중간에 10초씩 지연)
     for attempt in range(3):
         try:
-            print(f"🚀 {model_name} 로 분석 시도 중... ({attempt + 1}/3)")
+            print(f"▶️ 3단계: {model_name} AI 분석 중... ({attempt + 1}/3)")
             model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
+            
+            # 주식 뉴스(전쟁, 파업 등) 필터링 차단 방지 설정
+            response = model.generate_content(
+                prompt,
+                safety_settings={
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                }
+            )
+            print("✅ AI 분석 완료!")
             return response.text
         except Exception as e:
-            print(f"⚠️ 에러 발생: {e}")
+            print(f"⚠️ AI 분석 에러 발생: {e}")
             if attempt < 2:
-                print("⏳ 서버 안정화를 위해 10초 대기 후 다시 시도합니다...")
+                print("⏳ 10초 대기 후 다시 시도합니다...")
                 time.sleep(10)
             else:
                 return f"❌ 3번 재시도했으나 분석 실패: {e}"
 
 def send_telegram(text):
+    print("▶️ 4단계: 텔레그램 전송 중...")
     token = os.environ.get("TELEGRAM_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+    
     for i in range(0, len(text), 4000):
-        requests.post(url, json={"chat_id": chat_id, "text": text[i:i+4000]})
+        res = requests.post(url, json={"chat_id": chat_id, "text": text[i:i+4000]})
+        if res.status_code == 200:
+            print("✅ 텔레그램 메시지 전송 성공!")
+        else:
+            print(f"❌ 텔레그램 전송 실패! 상태 코드: {res.status_code}, 이유: {res.text}")
 
 if __name__ == "__main__":
     m_data = get_market_data()
     n_data = get_latest_news()
     report = analyze_with_gemini(m_data, n_data)
-    final_msg = f"🦅 [Pro 트레이더 분석 - {datetime.now().strftime('%Y-%m-%d')}]\n\n{report}"
+    final_msg = f"🦅 [주식 선생님의 아침 브리핑 - {datetime.now().strftime('%Y-%m-%d')}]\n\n{report}"
     send_telegram(final_msg)
+    print("🏁 모든 작업이 종료되었습니다.")
