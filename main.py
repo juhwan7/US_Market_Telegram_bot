@@ -6,7 +6,6 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold # 필터 
 import feedparser
 import time
 from datetime import datetime
-#깃허브액션 테스트
 
 # 1. 설정
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
@@ -57,6 +56,7 @@ def analyze_with_gemini(data, news):
     1. 강조할 문장이나 핵심 요약, 종목명 등은 <b>텍스트</b> 태그로 굵게 처리해. (주의: 터치 복사 기능이 있는 <code> 태그는 절대 쓰지 마)
     2. 어려운 전문 용어는 직관적이고 쉬운 일상어로 바꿔서 설명하거나, 옆에 괄호로 뜻을 달아줘.
     3. 엔터(줄바꿈)를 넉넉히 쓰고, 시각적으로 깔끔하게 기호(■, ▶, 💡, 🎯, ⚠️, ✅ 등)를 적절히 배치해.
+    4. 줄바꿈을 할 때 절대 <br>이나 <p> 같은 HTML 태그를 쓰지 말고, 실제 엔터키로 줄바꿈을 해.
 
     [어젯밤 미국 시장 데이터]: {data}
     [미국 시장 주요 뉴스]: {news}
@@ -110,17 +110,30 @@ def send_telegram(text):
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     
-    for i in range(0, len(text), 4000):
-        # 🚨 여기에 parse_mode="HTML"이 추가되었습니다!
-        res = requests.post(url, json={
+    # 🚨 핵심 방어막: AI가 마음대로 넣은 금지 태그(<br> 등)를 일반 줄바꿈(\n)으로 청소!
+    safe_text = text.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n").replace("</br>", "\n")
+    
+    for i in range(0, len(safe_text), 4000):
+        # 1차 시도: 예쁜 HTML 디자인 적용해서 보내기
+        payload = {
             "chat_id": chat_id, 
-            "text": text[i:i+4000],
+            "text": safe_text[i:i+4000],
             "parse_mode": "HTML"
-        })
+        }
+        res = requests.post(url, json=payload)
+        
         if res.status_code == 200:
             print("✅ 텔레그램 메시지 전송 성공!")
         else:
             print(f"❌ 텔레그램 전송 실패! 상태 코드: {res.status_code}, 이유: {res.text}")
+            # 2차 시도: 에러가 나면 디자인(HTML) 옵션을 빼고 순수 글자만 강제 전송
+            payload.pop("parse_mode", None)
+            res_retry = requests.post(url, json=payload)
+            
+            if res_retry.status_code == 200:
+                print("✅ 일반 텍스트로 전송 성공!")
+            else:
+                print(f"❌ 텔레그램 전송 완전 실패! 이유: {res_retry.text}")
 
 if __name__ == "__main__":
     m_data = get_market_data()
@@ -129,3 +142,4 @@ if __name__ == "__main__":
     final_msg = f"🦅 [미장 마감 브리핑 - {datetime.now().strftime('%Y-%m-%d')}]\n\n{report}"    
     send_telegram(final_msg)
     print("🏁 모든 작업이 종료되었습니다.")
+
