@@ -1,5 +1,5 @@
 requests
 yfinance
 pandas
-google-generativeai
+google-genai
 feedparser
