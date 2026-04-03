@@ -3,8 +3,8 @@ name: US Market Telegram Bot
 on:
   push:
     branches: [ "main" ]
-    schedule:
-      - cron: '0 22 * * *'
+  schedule: # 들여쓰기를 push와 동일한 선상으로 수정
+    - cron: '0 21 * * *'
   workflow_dispatch:
 
 jobs:
@@ -17,9 +17,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 파이썬 환경 세팅
-        uses: actions/setup-python@v5ㅅ
+        uses: actions/setup-python@v5 # 끝에 있던 'ㅅ' 제거
         with:
-          python-version: '3.11'ㅅ
+          python-version: '3.11' # 끝에 있던 'ㅅ' 제거
 
       - name: 패키지 강제 직접 설치 (에러 해결의 핵심)
         run: |
